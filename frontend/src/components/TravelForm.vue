@@ -1,6 +1,5 @@
 <template>
-  <div>
-    <h3>创建旅行请求</h3>
+  <div> <h3>创建旅行请求</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input v-model="form.destination" placeholder="目的地（例：日本 东京）" />
       <input v-model="form.days" placeholder="天数" />
@@ -10,84 +9,112 @@
     </div>
 
     <div style="margin-top:10px">
-      <button @click="generate" :disabled="loading">{{ loading? '生成中...' : '生成并保存行程' }}</button>
-      <button @click="preview">仅生成（不保存）</button>
+      <button @click="generate(true)" :disabled="loading">{{ loading? '生成中...' : '生成并保存行程' }}</button>
+      <button @click="generate(false)" :disabled="loading">仅生成（不保存）</button>
     </div>
 
-    <div v-if="itinerary" style="margin-top:20px">
+    <div v-if="itinerary" style="margin-top:20px; border-top: 1px solid #444; padding-top: 20px;">
+      
       <itinerary-view :data="itinerary" />
-      <map-amap v-if="showMap" :places="places" />
+      
+      <MapLeaflet 
+        v-if="mapPois && mapPois.length > 0" 
+        :pois="mapPois" 
+        style="margin-top: 20px;" 
+      />
     </div>
 
-    <div style="margin-top:20px">
-      <label>设置（临时注入 API Key）：</label>
-      <div>
-        <input v-model="localMapKey" placeholder="VITE_MAP_KEY (临时)" />
-        <button @click="applyMapKey">应用 Map Key</button>
-      </div>
-    </div>
-  </div>
-</template>
+    </div> </template>
 
 <script>
 import axios from 'axios';
-import { supabase } from '../lib/supabase';
+// import { supabase } from '../lib/supabase'; // 假设 supabase 在父组件或 main.js 处理
 import SpeechButton from './SpeechButton.vue';
 import ItineraryView from './ItineraryView.vue';
-import MapAmap from './MapAmap.vue';
+// [已修复] 导入 MapLeaflet
+import MapLeaflet from './MapLeaflet.vue';
 
 export default {
-  components: { SpeechButton, ItineraryView, MapAmap },
+  // [已修复] 注册 MapLeaflet
+  components: { SpeechButton, ItineraryView, MapLeaflet }, 
   props: ['user'],
   data() {
     return {
       form: { destination:'', days:3, budget:'', prefs:'' },
       loading:false,
-      itinerary:null,
-      showMap:false,
-      places: [],
-      localMapKey: ''
+      itinerary:null, // AI 返回的完整行程
     };
   },
+  
+  // [新增] 计算属性，自动从行程(itinerary)中提取地图所需的数据
+  computed: {
+    /**
+     * @returns {Array<{name: string, lat: number, lng: number}> | null}
+     * 从 this.itinerary 中提取并扁平化所有 POI 点
+     */
+    mapPois() {
+      if (!this.itinerary || !this.itinerary.days) {
+        return null;
+      }
+      
+      const pois = [];
+      for (const day of this.itinerary.days) {
+        if (day.items) {
+          for (const item of day.items) {
+            // 确保这个 item 是一个地点，并且有坐标 (lat/lng)
+            if (item.name && item.lat && item.lng) {
+              pois.push({
+                name: item.name,
+                lat: item.lat,
+                lng: item.lng
+              });
+            }
+          }
+        }
+      }
+      return pois.length > 0 ? pois : null;
+    }
+  },
+
   methods: {
     onSpeech(text) {
       this.form.destination = text;
     },
-    async generate(save=true) {
+    async generate(save = true) {
       if (!this.form.destination) return alert('请填写目的地');
       this.loading = true;
+      this.itinerary = null; // 每次生成时先清空上次结果
+      
       try {
         const url = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-        const body = { ...this.form, user_id: this.user?.id ?? null };
+        
+        const body = { 
+          ...this.form, 
+          user_id: this.user?.id ?? null,
+          save: save // 告诉后端是否保存
+        };
+        
         const res = await axios.post(url + '/api/generate-and-save', body);
-        this.itinerary = res.data.itinerary ?? res.data;
-        // show map: try extract names and geocode later
-        this.places = this.extractPlaces(this.itinerary);
-        this.showMap = this.places.length>0;
+        
+        // 将 AI 结果赋值给 this.itinerary
+        this.itinerary = res.data.itinerary ?? res.data; 
+
       } catch (e) {
         console.error(e);
-        alert('生成失败，请看控制台');
+        let errorMsg = e.message || '生成失败，请看控制台';
+        if (e.response && e.response.data && e.response.data.error) {
+          errorMsg = e.response.data.error;
+        }
+        alert(errorMsg);
       } finally {
         this.loading = false;
       }
     },
-    async preview() { await this.generate(false); },
-    extractPlaces(it) {
-      if (!it || !it.days) return [];
-      const names = [];
-      for (const d of it.days) {
-        for (const item of d.items||[]) {
-          if (item.name) names.push(item.name);
-        }
-      }
-      // 转为对象数组： { name }
-      return [...new Set(names)].map(n=>({ name: n }));
+    
+    // "仅生成"按钮调用 generate(false)
+    async preview() { 
+      await this.generate(false); 
     },
-    applyMapKey() {
-      // 将输入设置到 window（仅本地临时使用）
-      window.__MAP_KEY__ = this.localMapKey;
-      alert('已应用 Map Key（仅本地临时）');
-    }
   }
 }
 </script>

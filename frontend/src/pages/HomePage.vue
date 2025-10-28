@@ -1,13 +1,15 @@
 <template>
   <div>
     <h2>登录 / 注册</h2>
-    <div style="display:flex;gap:12px;align-items:center">
+
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <input v-model="email" placeholder="Email" />
       <input v-model="password" type="password" placeholder="Password" />
       <button @click="signUp">注册</button>
       <button @click="signIn">登录</button>
       <button @click="signOut">登出</button>
-      <div v-if="user">已登录：{{ user.email }}</div>
+
+      <div v-if="user" style="color:green">已登录：{{ user.email }}</div>
     </div>
 
     <hr style="margin:20px 0" />
@@ -21,37 +23,55 @@
   </div>
 </template>
 
-<script>
-import { supabase } from '../lib/supabase';
-import TravelForm from '../components/TravelForm.vue';
+<script setup>
+import { ref, onMounted } from 'vue'
+import { supabase } from '../lib/supabase'
+import TravelForm from '../components/TravelForm.vue'
 
-export default {
-  components: { TravelForm },
-  data() {
-    return { email:'', password:'', user: null }
-  },
-  mounted() {
-    this.user = supabase.auth.user();
-    supabase.auth.onAuthStateChange((_event, session) => {
-      this.user = session?.user ?? null;
-    });
-  },
-  methods: {
-    async signUp() {
-      const { user, error } = await supabase.auth.signUp({ email:this.email, password:this.password });
-      if (error) alert('注册失败：'+error.message); else alert('注册成功，请检查邮箱验证（如果有）');
-    },
-    async signIn() {
-      const { user, error } = await supabase.auth.signIn({ email:this.email, password:this.password });
-      if (error) alert('登录失败：'+error.message); else this.user = user;
-    },
-    async signOut() {
-      await supabase.auth.signOut();
-      this.user = null;
-    },
-    onSaved(saved) {
-      alert('行程已保存到云端');
-    }
+const email = ref('')
+const password = ref('')
+const user = ref(null)
+
+const onSaved = () => alert('✅ 行程已保存到云端')
+
+onMounted(async () => {
+  // 初始检查登录状态
+  const { data } = await supabase.auth.getUser()
+  user.value = data?.user || null
+
+  // 监听登录状态变化
+  supabase.auth.onAuthStateChange((_event, session) => {
+    user.value = session?.user || null
+  })
+})
+
+// 注册
+const signUp = async () => {
+  const { data, error } = await supabase.auth.signUp({
+    email: email.value,
+    password: password.value,
+  })
+  if (error) alert('注册失败：' + error.message)
+  else alert('注册成功！请查收邮箱进行验证')
+}
+
+// 登录
+const signIn = async () => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.value,
+    password: password.value,
+  })
+  if (error) alert('登录失败：' + error.message)
+  else {
+    user.value = data.user
+    alert('✅ 登录成功！')
   }
+}
+
+// 登出
+const signOut = async () => {
+  await supabase.auth.signOut()
+  user.value = null
+  alert('已登出')
 }
 </script>

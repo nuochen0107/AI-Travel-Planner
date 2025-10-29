@@ -17,8 +17,12 @@
     <travel-form v-if="user" :user="user" @saved="onSaved" />
     <div v-else style="margin-top:12px;color:#888">请先登录以保存行程</div>
 
-    <div style="margin-top:20px">
+    <div style="margin-top:20px; display: flex; gap: 10px;">
       <button @click="$emit('goto')">查看已保存行程</button>
+      
+      <button @click="$emit('gotoBudget')" style="background-color: #3b8a5a;">
+        费用管理
+      </button>
     </div>
   </div>
 </template>

@@ -1,24 +1,34 @@
 <template>
-  <div style="max-width:900px;margin:30px auto;font-family:Arial,Helvetica,sans-serif">
-    <h1>🌍 AI 旅行规划师（前端）</h1>
+  <div style="max-width: 800px; margin: 20px auto; padding: 20px;">
+    
+    <HomePage 
+      v-if="currentPage === 'home'" 
+      @goto="currentPage = 'list'"
+      @gotoBudget="currentPage = 'budget'" />
 
-    <div style="display:flex;gap:20px">
-      <div style="flex:1">
-        <home-page v-if="page==='home'" @goto='page="itins"'/>
-        <itineraries-page v-if="page==='itins'" @back='page="home"'/>
-      </div>
-    </div>
+    <ItinerariesPage 
+      v-if="currentPage === 'list'"
+      @back="currentPage = 'home'"
+    />
+
+    <BudgetPage 
+      v-if="currentPage === 'budget'"
+      @back="currentPage = 'home'"
+    />
+
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue';
+
 import HomePage from './pages/HomePage.vue';
 import ItinerariesPage from './pages/ItinerariesPage.vue';
+import BudgetPage from './pages/BudgetPage.vue'; // [新增] 导入记账页
 
-export default {
-  components: { HomePage, ItinerariesPage },
-  data() {
-    return { page: 'home' }
-  }
-}
+const currentPage = ref('home'); 
 </script>
+
+<style>
+/* ... (全局样式保持不变) ... */
+</style>

@@ -3,7 +3,8 @@
     <div v-if="selectedItinerary">
       <button @click="selectedItinerary = null">&lt; 返回列表</button>
       
-      <ItineraryView :data="selectedItinerary" style="margin-top: 20px;" />
+      <ItineraryView :data="selectedItinerary" 
+      :itinerary-id="selectedItineraryId" style="margin-top: 20px;" />
       
       <MapLeaflet
         v-if="mapPois && mapPois.length > 0"
@@ -60,6 +61,7 @@ const emit = defineEmits(['back']);
 const loading = ref(true);
 const itineraries = ref([]); // 只存列表 (id, title)
 const selectedItinerary = ref(null); // [新增] 存完整的行程 JSON {title, days...}
+const selectedItineraryId = ref(null); // [新增] 存当前行程的数据库 ID
 
 // --- [新增] 计算属性 (和 TravelForm.vue 里的一样) ---
 const mapPois = computed(() => {
@@ -93,6 +95,7 @@ async function getUser() {
 async function fetchItineraries() {
   loading.value = true;
   selectedItinerary.value = null; // [新增] 确保回到列表时清空详情
+  selectedItineraryId.value = null; // [新增] 清空 ID
   const user = await getUser();
   if (!user) {
     alert('请先登录');
@@ -144,6 +147,7 @@ async function viewItinerary(id) {
     if (data && data.payload) {
       // 把 payload (完整的行程 JSON) 存入 ref
       selectedItinerary.value = data.payload; 
+      selectedItineraryId.value = id;
     } else {
       alert('未找到行程详情。');
     }

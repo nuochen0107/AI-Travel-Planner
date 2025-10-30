@@ -58,9 +58,29 @@ const updateMarkers = (newPois) => {
   console.log("🗺️ MapLeaflet 正在更新标记点:", JSON.stringify(newPois, null, 2));
 
   newPois.forEach(poi => {
+
     L.marker([poi.lat, poi.lng])
-     .bindPopup(poi.name)
-     .addTo(markerLayer.value);
+     .addTo(markerLayer.value)
+     .bindPopup(`
+    <strong style="font-size: 1.1em; color: #000;">${poi.name}</strong>
+    <br>
+    <hr style="margin: 5px 0; border-color: #ccc;">
+    <a 
+      href="https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}" 
+      target="_blank" 
+      style="color: #0056b3; text-decoration: none;"
+    >
+      [ 谷歌地图导航 ]
+    </a>
+    <br>
+    <a 
+      href="https://ditu.amap.com/search?query=${poi.name}&loc=${poi.lng},${poi.lat}" 
+      target="_blank" 
+      style="color: #0056b3; text-decoration: none;"
+    >
+      [ 高德地图搜索 ]
+    </a>
+ `);
   });
 
   // [修复核心] 重新聚焦地图到第一个点

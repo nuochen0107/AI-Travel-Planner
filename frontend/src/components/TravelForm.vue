@@ -3,6 +3,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input v-model="form.destination" placeholder="目的地（例：日本 东京）" />
       <input v-model="form.days" placeholder="天数" />
+      <input v-model.number="form.people" type="number" placeholder="同行人数 (例: 2)" />
       <input v-model="form.budget" placeholder="预算（CNY）" />
       <input v-model="form.prefs" placeholder="偏好（美食、动漫、亲子）" />
       <speech-button @result="onSpeech" />
@@ -40,7 +41,7 @@ export default {
   props: ['user'],
   data() {
     return {
-      form: { destination:'', days:3, budget:'', prefs:'' },
+      form: { destination:'', days:3, people: 1,budget:'', prefs:'' },
       loading:false,
       itinerary:null, // AI 返回的完整行程
     };

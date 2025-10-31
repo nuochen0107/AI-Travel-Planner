@@ -1,4 +1,6 @@
-// ✅ backend/index.js - (最终修复：带“黑匣子”日志)
+// ✅ backend/index.js (v26 - 稳定回滚版)
+// 目标：不惜一切代价拿回 lat/lng，放弃复杂的“同行人数”计算
+
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -6,36 +8,50 @@ import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
-// ... (app, port, cors, express.json, supabase init) ...
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "Backend is running properly 🚀" });
 });
 
 app.post("/api/generate-and-save", async (req, res) => {
-  const { destination = "", days = "", budget = "", prefs = "", user_id = null, save = true } = req.body;
+  const { destination = "", days = "", budget = "", prefs = "", people = "1", user_id = null, save = true } = req.body;
 
+  // [回滚 v26] 
+  // 1. 移除 '同行人数' 的复杂计算要求 (我们妥协了)。
+  // 2. 强制要求中文和坐标。
   const prompt = `
-你是旅行规划师。请为下面信息生成一个结构化 JSON 行程。
-目的地: ${destination}
-天数: ${days}
-预算: ${budget}元
-偏好: ${prefs}
-返回 JSON，包含字段: title, days: [{date, items:[{time,type,name,notes,cost,lat,lng}]}], total_estimated_cost, cost_breakdown
-请确保为 'items' 数组中的每一个地点（如景点、餐厅、住宿）提供准确的 'lat' (纬度) 和 'lng' (经度) 坐标。
+  [!! 绝对要求 !!] 你的回答 *必须* 使用简体中文。
+
+  请为下面信息生成一个 JSON 格式的旅行规划：
+  - 目的地: ${destination}
+  - 天数: ${days}
+  - 同行人数: ${people} (注：预算为总预算)
+  - 预算: ${budget}元
+  - 偏好: ${prefs}
+
+  [!! 关键JSON结构 !!]
+  返回一个 JSON 对象，必须包含:
+  1. title (string)
+  2. days (array): 
+     - 每个 'day' 包含 'date' (string) 和 'items' (array)
+  3. items (array):
+     - 每个 'item' 必须包含: time, type (中文类型, e.g., "景点"), name, notes, cost (数字), lat (纬度), lng (经度)
+
+  [!! 再次强调 !!] 
+  为 'items' 数组中的 *每一个* 地点提供准确的 'lat' 和 'lng' 坐标 *至关重要*。
   `;
 
   try {
     let itineraryJson;
     const apiKey = process.env.LLM_API_KEY;
 
-    // 1. [假数据分支]
+    // 1. [假数据分支] (这个不变)
     if (!apiKey) {
       console.log("⚠️ 未提供 LLM_API_KEY，使用假数据（调试模式）");
       itineraryJson = {
@@ -55,14 +71,18 @@ app.post("/api/generate-and-save", async (req, res) => {
     } else {
       
       // 2. [阿里云分支]
-      console.log("🚀 正在调用 LLM API (Aliyun DashScope)...");
+      console.log("🚀 正在调用 LLM API (Aliyun DashScope)... [v26 尝试]");
       const resp = await fetch("https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: "qwen-turbo",
           input: { messages: [{ role: "user", content: prompt }] },
-          parameters: { temperature: 0.7, response_format: { "type": "json_object" } }
+          parameters: {
+             temperature: 0.7
+             // [回滚 v26] 移除了 'response_format'，
+             // 靠 prompt 本身和我们的 regex 来保证 JSON。
+          }
         }),
       });
 
@@ -74,34 +94,21 @@ app.post("/api/generate-and-save", async (req, res) => {
       }
 
       const data = await resp.json();
-      
-      // --- [黑匣子日志] ---
-      // 这是最关键的一步：打印出阿里返回的 *所有* 内容
-      console.log("✅ LLM API 响应成功。黑匣子日志 (完整响应):");
+      // [回滚 v26] 重新打开“黑匣子”日志
+      console.log("✅ LLM API (Aliyun) 响应成功。黑匣子日志 (完整响应):");
       console.log(JSON.stringify(data, null, 2));
-      // --- [黑匣子结束] ---
 
-      // [修复尝试] 我们现在猜测两个路径：'output.text' 或者 'output.choices[0]...'
+      // [回滚 v26] 
+      // 我们现在 *必须* 依赖 output.text，因为我们没有强制 'json_object'
       let rawText = "{}";
-      
-      // 尝试 1: 直接的 output.text (如你所建议)
       if (data.output && typeof data.output.text === 'string' && data.output.text.startsWith('{')) {
         rawText = data.output.text;
-        console.log("ℹ️ 提取路径 1: data.output.text");
-      
-      // 尝试 2: 复杂的 message.content (我们之前的尝试)
-      } else if (data.output?.choices?.[0]?.message?.content) {
-        const messageContent = data.output.choices[0].message.content;
-        if (typeof messageContent === 'string') {
-          rawText = messageContent;
-          console.log("ℹ️ 提取路径 2a: data.output.choices...content (string)");
-        } else if (Array.isArray(messageContent)) {
-          rawText = messageContent
-            .filter(part => part.type === 'text' && part.text)
-            .map(part => part.text)
-            .join('');
-          console.log("ℹ️ 提取路径 2b: data.output.choices...content (array)");
-        }
+        console.log("ℹ️ [v26] 提取路径: data.output.text");
+      } else {
+         console.error("❌ [v26] AI 未能在 output.text 中返回 JSON。");
+         // 尝试我们之前 v18 的备用路径 (以防万一)
+         const messageContent = data.output?.choices?.[0]?.message?.content;
+         if (typeof messageContent === 'string') rawText = messageContent;
       }
       
       const m = rawText.match(/\{[\s\S]*\}/);
@@ -119,11 +126,10 @@ app.post("/api/generate-and-save", async (req, res) => {
       }
     }
 
-    // 3. [保存分支] (此处逻辑不变)
+    // 3. [保存分支] (这个不变)
     let savedData = null;
     if (save) {
       console.log(`💾 正在保存行程到 Supabase...`);
-      // ... (省略 insert 代码, 它没问题) ...
       const { data, error } = await supabase.from("itineraries").insert([{ title: itineraryJson.title || `${destination} 行程`, user_id: user_id, payload: itineraryJson }]).select().single();
       if (error) { console.error("Supabase insert err", error); return res.status(500).json({ error: "保存到数据库失败", detail: error }); }
       savedData = data;

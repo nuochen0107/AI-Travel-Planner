@@ -1,0 +1,40 @@
+# .github/workflows/docker-ci.yml
+
+name: CI - Build and Push Backend Docker Image to Aliyun
+
+# 触发器：当代码被 push 到 'main' 分支时运行
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    # 运行环境：使用 GitHub 托管的 Linux 服务器
+    runs-on: ubuntu-latest 
+
+    steps:
+      # 第 1 步：检出 (Checkout) 你的代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 第 2 步：登录到阿里云镜像仓库 (ACR)
+      # (它会使用你在步骤一中设置的 GitHub Secrets)
+      - name: Log in to Aliyun Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ALIYUN_REGISTRY_URL }}    # (cn-hangzhou.personal.cr.aliyuncs.com)
+          username: ${{ secrets.ALIYUN_REGISTRY_USERNAME }} # (aliyun0650732255)
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }} # (你的密码)
+
+      # 第 3 步：构建 Docker 镜像并推送到 ACR
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          # [关键] 告诉 Dockerfile 在 'backend' 文件夹里
+          context: ./backend  
+          push: true
+          # [!!! 关键 !!!] 
+          # 这是你镜像的完整路径, 你必须修改它
+          # 把 [你的命名空间] 替换成你在阿里云上创建的那个
+          # (例如: ai-travel-planner)
+          tags: ${{ secrets.ALIYUN_REGISTRY_URL }}/ai-travel-planner-cn/ai-travel-backend:latest

@@ -1,0 +1,42 @@
+name: Build and Push Docker Image to Aliyun CR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set registry variables
+        run: |
+          echo "REGISTRY=${{ secrets.ALIYUN_REGISTRY_URL }}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=ai-travel-planner-cn/ai-travel-backend" >> $GITHUB_ENV
+
+      - name: Log in to Aliyun Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ALIYUN_REGISTRY_URL }}
+          username: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+      - name: Verify docker login
+        run: |
+          echo "=== docker info (auth and registry) ==="
+          docker info
+          echo "=== docker login check: try listing tags (optional) ==="
+          # optional quick check (may fail on some registries)
+          # docker pull ${{ secrets.ALIYUN_REGISTRY_URL }}/ai-travel-planner-cn/ai-travel-backend:latest || true
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.ALIYUN_REGISTRY_URL }}/ai-travel-planner-cn/ai-travel-backend:latest
+          # 如果需要多平台构建，添加 platforms: 'linux/amd64'

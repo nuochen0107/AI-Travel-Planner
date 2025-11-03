@@ -1,6 +1,6 @@
 # AI 旅行规划师 (AI Travel Planner)
 
-本项目是为 [课程名称或作业名称] 设计的 Web 应用，旨在实现一个端到端的 AI 旅行助手。
+本项目是大语言模型辅助软件工程课的第三次作业，设计了一个 Web 应用，旨在实现一个端到端的 AI 旅行助手。
 
 ## 一、说明
 
@@ -33,7 +33,7 @@
 * **前端 (Frontend)**：`Vue 3` (使用 Vite)
 * **后端 (Backend)**：`Node.js` (使用 Express)
 * **数据库 / 认证 (DB / Auth)**：`Supabase` (替代 Firebase/Firestore)
-* **地图 (Map)**：`Leaflet` + `OpenStreetMap` (替代高德/百度，以规避 `sKey` 限制并方便助教运行)
+* **地图 (Map)**：`Leaflet` + `OpenStreetMap` (替代高德/百度，以规避 `sKey` 限制)
 * **AI 行程规划 (LLM)**：`阿里云通义千问 (DashScope)`
 * **后端容器化 (Containerization)**：`Docker`
 * **持续集成 (CI/CD)**：`GitHub Actions` (自动构建后端镜像并推送到阿里云 ACR)
